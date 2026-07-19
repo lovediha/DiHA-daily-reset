@@ -1,0 +1,561 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DiHAdeclutter</title><style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+.page{width:100%;min-height:100vh;display:flex;justify-content:center;align-items:center;transition:background 1.5s ease;}
+
+/* ---------- SPLASH (unchanged) ---------- */
+#splash{background:#000;}
+#splash.reveal{background:#fff;}
+.splash-container{display:flex;flex-direction:column;align-items:center;}
+svg{width:280px;}
+.line,.line-fill{
+ fill:none;
+ stroke:rgba(255,255,255,0.8);
+ stroke-width:2;
+ stroke-dasharray:1600;
+ stroke-dashoffset:1600;
+ animation:draw 3.2s ease forwards;
+}
+.line:nth-child(1){animation-delay:0s;}
+.line:nth-child(2){animation-delay:0.4s;}
+.line-fill{fill:rgba(41,161,255,0.18);stroke:rgba(255,255,255,0.6);animation-delay:0.8s;}
+@keyframes draw{to{stroke-dashoffset:0;}}
+.splash-text{margin-top:18px;font-size:12px;letter-spacing:0.25em;color:rgba(255,255,255,0.7);opacity:0;animation:fadeText 2s ease forwards;animation-delay:2.2s;}
+@keyframes fadeText{to{opacity:0.7;}}
+
+/* ---------- RATO SCREEN ---------- */
+#rato{display:none;background:#fff;}
+#rato.show{display:flex;flex-direction:column;}
+.rato-container{display:flex;flex-direction:column;align-items:center;max-width:340px;width:100%;padding:24px;}
+.rato-container svg{width:150px;}
+
+.daily-reset{margin:10px 0 0;font-size:0.72rem;letter-spacing:0.2em;opacity:0.55;text-align:center;}
+.title h1{font-size:1.7rem;font-weight:380;color:rgba(0,0,0,0.75);text-align:center;margin-top:8px;}
+.title .accent{color:#29A1FF;}
+.title h2{font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;opacity:0.5;text-align:center;margin-top:4px;}
+
+.divider{width:100%;max-width:280px;height:1px;background:rgba(0,0,0,0.15);margin:1.4rem auto;}
+
+/* lives */
+.lives-row{display:flex;gap:8px;justify-content:center;margin:6px 0 14px;}
+.life{width:16px;height:16px;border-radius:50%;background:#29A1FF;transition:all .4s ease;}
+.life.lost{background:rgba(0,0,0,0.12);transform:scale(0.8);}
+
+.day-label{font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;opacity:0.45;text-align:center;}
+.rato-msg{margin:14px 0;padding:16px;border:1.5px solid rgba(41,161,255,0.4);border-radius:12px;background:rgba(41,161,255,0.05);font-size:0.95rem;line-height:1.5;color:rgba(0,0,0,0.75);text-align:left;width:100%;}
+
+.task-box{width:100%;text-align:left;}
+.task-box h3{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;opacity:0.5;margin-bottom:4px;}
+.task-box p{font-size:1.05rem;font-weight:500;color:rgba(0,0,0,0.8);}
+
+textarea{width:100%;margin-top:14px;padding:10px;border:1px solid rgba(0,0,0,0.2);border-radius:8px;font-style:italic;font-size:0.9rem;resize:vertical;min-height:60px;font-family:inherit;}
+
+.btn-row{display:flex;gap:10px;margin-top:14px;width:100%;}
+button{flex:1;padding:11px 14px;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;}
+.btn-primary{background:#29A1FF;color:#fff;}
+.btn-secondary{background:transparent;border:1.5px solid rgba(0,0,0,0.2);color:rgba(0,0,0,0.6);}
+
+.streak-note{margin-top:14px;font-size:0.72rem;opacity:0.45;text-align:center;line-height:1.4;}
+
+.test-controls{margin-top:24px;padding-top:14px;border-top:1px dashed rgba(0,0,0,0.15);width:100%;text-align:center;}
+.test-controls span{font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;opacity:0.35;}
+.test-controls button{margin-top:8px;background:transparent;border:1px solid rgba(0,0,0,0.15);color:rgba(0,0,0,0.4);font-size:0.7rem;padding:6px 10px;flex:none;}
+
+/* ---------- SHARED ONBOARDING SCREEN STYLE ---------- */
+.onb{display:none;background:#fff;}
+.onb.show{display:flex;flex-direction:column;}
+.onb-container{display:flex;flex-direction:column;align-items:center;max-width:340px;width:100%;padding:24px;text-align:left;}
+.onb-container h1{font-size:1.5rem;font-weight:500;color:rgba(0,0,0,0.8);text-align:center;margin-bottom:6px;}
+.onb-container .eyebrow{font-size:0.65rem;letter-spacing:0.18em;text-transform:uppercase;opacity:0.45;text-align:center;margin-bottom:10px;}
+.onb-container p.body{font-size:0.92rem;line-height:1.55;opacity:0.7;margin-bottom:14px;}
+.onb-container p.prompt{font-size:1.05rem;line-height:1.5;font-weight:500;color:rgba(0,0,0,0.8);margin-bottom:10px;}
+.onb-container p.line{font-size:0.8rem;font-style:italic;opacity:0.5;text-align:center;margin-top:14px;line-height:1.5;}
+.word-count{font-size:0.7rem;opacity:0.4;text-align:right;margin-top:4px;}
+.word-count.over{color:#d90000;opacity:0.8;}
+
+.choice-row{display:flex;gap:10px;margin-top:20px;width:100%;}
+.choice-row button{flex:1;padding:13px 10px;border-radius:10px;font-size:0.85rem;font-weight:600;border:none;cursor:pointer;}
+.choice-declutter{background:#29A1FF;color:#fff;}
+.choice-hoard{background:transparent;border:1.5px solid rgba(0,0,0,0.2);color:rgba(0,0,0,0.55);}
+
+.single-btn{margin-top:20px;width:100%;padding:13px;border:none;border-radius:10px;background:#29A1FF;color:#fff;font-weight:600;font-size:0.85rem;cursor:pointer;}
+
+/* clock badge */
+.clock-badge{width:120px;height:120px;border-radius:50%;border:3px solid #29A1FF;display:flex;align-items:center;justify-content:center;margin:10px auto 6px;background:rgba(41,161,255,0.06);}
+.clock-badge svg{width:60px;height:60px;}
+
+/* siren overlay */
+#siren-overlay{display:none;position:fixed;inset:0;background:#d90000;z-index:999;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:30px;}
+#siren-overlay.active{display:flex;}
+#siren-overlay h1{font-size:2.4rem;letter-spacing:0.05em;animation:pulse 0.4s infinite alternate;}
+#siren-overlay p{margin-top:16px;font-size:0.95rem;opacity:0.9;max-width:300px;}
+@keyframes pulse{to{transform:scale(1.08);opacity:0.7;}}
+
+</style></head><body>
+
+<!-- SPLASH -->
+<div id="splash" class="page">
+ <div class="splash-container">
+  <svg viewBox="0 0 600 600">
+   <rect class="line" x="102" y="102" width="396" height="396"></rect>
+   <circle class="line" cx="300" cy="300" r="198"></circle>
+   <polygon class="line-fill" points="300,102 473.2,398 126.8,398"></polygon>
+  </svg>
+  <div class="splash-text">DiHAdeclutter</div>
+ </div>
+</div>
+
+<!-- OPENING NOTE — SLIDE 1 -->
+<div id="openSlide1" class="page onb">
+ <div class="onb-container">
+  <div class="eyebrow">Dumela</div>
+  <p class="body" style="font-size:1rem;line-height:1.7;">Greeting to you, reading this note. Welcome to the beginning of the rest of your life. You called this moment forth — congratulations for honouring it by showing up for self.</p>
+  <p class="body" style="text-align:center;opacity:0.5;font-style:italic;">*claps for yourself*</p>
+  <button class="single-btn" id="openSlide1Btn">Next</button>
+ </div>
+</div>
+
+<!-- OPENING NOTE — SLIDE 2 + CHOICE -->
+<div id="openSlide2" class="page onb">
+ <div class="onb-container">
+  <p class="body" style="font-size:1rem;line-height:1.7;">D<span style="color:#29A1FF">i</span>HA Dihangwane is a method of movement toward clarity — the undressing and redressing, from realisation to recognition, through emotional, physical, mental and spiritual decluttering.</p>
+  <p class="body" style="font-size:1rem;line-height:1.7;"><b>A win is a win.</b> The DiHAdeclutter Daily Reset is your daily doorway back to yourself — small enough to actually do, honest enough to actually matter.</p>
+  <p class="body" style="font-size:1rem;line-height:1.7;">This is not a task list. This is a chance of a lifetime, one small choice at a time.</p>
+  <div class="choice-row">
+   <button class="choice-hoard" id="hoardBtn">Hoard on</button>
+   <button class="choice-declutter" id="declutterBtn">Declutter</button>
+  </div>
+ </div>
+</div>
+
+<!-- HOARD EXIT SCREEN -->
+<div id="hoardExit" class="page onb">
+ <div class="onb-container" style="text-align:center;">
+  <div class="eyebrow">Okay</div>
+  <p class="body">No pressure. The app will close now.</p>
+  <p class="body">RATO will check in three times over the next 9 days — quietly, not to push, just to see if you're ready. If there's no response, RATO will stop.</p>
+  <p class="line">You can always come back and choose Declutter.</p>
+ </div>
+</div>
+
+<!-- GRATITUDE SCREEN -->
+<div id="gratitude" class="page onb">
+ <div class="onb-container">
+  <div class="eyebrow">Daily Ritual</div>
+  <p class="prompt">What are you grateful for in this moment, right now?</p>
+  <textarea id="gratitudeInput" placeholder="Write freely..."></textarea>
+  <p class="line">Movement is not about what's next — it's about choosing what moves now.</p>
+  <button class="single-btn" id="gratitudeBtn">Gratitude</button>
+ </div>
+</div>
+
+<!-- RATO INTRO SCREEN — loads the real RATO in an isolated iframe -->
+<div id="ratoIntro" class="page onb" style="padding:0;">
+ <div style="position:relative;width:100%;height:100vh;">
+  <iframe id="ratoFrame" src="rato-intro.html" style="width:100%;height:100%;border:none;display:block;"></iframe>
+  <div id="ratoGiftBox" style="display:none;position:fixed;bottom:76px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(0,0,0,0.85);color:#fff;padding:10px 16px;border-radius:10px;font-size:0.72rem;text-align:center;max-width:280px;">
+   Your DiHAclock — a gift from RATO, for showing up.<br>
+   <a href="#" id="giftDownloadLink" style="color:#29A1FF;font-weight:600;">Download</a>
+   <!-- TODO: replace href="#" with the real DiHAclock asset link once received -->
+  </div>
+  <button id="ratoContinueBtn" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:50;background:#29A1FF;color:#fff;border:none;padding:12px 20px;border-radius:24px;font-size:0.8rem;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.25);">
+   Daily Reset →
+  </button>
+ </div>
+</div>
+
+<!-- CREATE PROFILE -->
+<div id="profileForm" class="page onb">
+ <div class="onb-container">
+  <div class="eyebrow">Create Your Profile</div>
+  <input type="text" id="profileName" placeholder="Name & Surname" style="width:100%;padding:11px;margin-bottom:10px;border:1px solid rgba(0,0,0,0.2);border-radius:8px;font-size:0.9rem;font-family:inherit;">
+  <input type="tel" id="profileWhatsapp" placeholder="WhatsApp Number" style="width:100%;padding:11px;margin-bottom:10px;border:1px solid rgba(0,0,0,0.2);border-radius:8px;font-size:0.9rem;font-family:inherit;">
+  <textarea id="profileGoal" placeholder="A goal, a question, or just a reflection — whatever you'd like to leave here."></textarea>
+  <button class="single-btn" id="profileSaveBtn">SAVE</button>
+ </div>
+</div>
+
+<!-- LETTER 1: 5-YEAR-OLD SELF -->
+<div id="letter1" class="page onb">
+ <div class="onb-container">
+  <div class="eyebrow">This Morning's Daily Reset — 1 of 3</div>
+  <p class="prompt">Write a letter to your 5-year-old self, in no longer than 60 words.</p>
+  <textarea id="letter1Input" placeholder="Dear little one..."></textarea>
+  <div class="word-count" id="letter1Count">0 / 60 words</div>
+  <button class="single-btn" id="letter1Btn">Declutter</button>
+ </div>
+</div>
+
+<!-- LETTER 2: FUTURE SELF -->
+<div id="letter2" class="page onb">
+ <div class="onb-container">
+  <div class="eyebrow">This Morning's Daily Reset — 2 of 3</div>
+  <p class="prompt">Now, write a letter to your future self, five years from now.</p>
+  <textarea id="letter2Input" placeholder="Dear future me..."></textarea>
+  <button class="single-btn" id="letter2Btn">Declutter</button>
+ </div>
+</div>
+
+<!-- FIRST TIME QUESTION -->
+<div id="firstTime" class="page onb">
+ <div class="onb-container">
+  <div class="eyebrow">This Morning's Daily Reset — 3 of 3</div>
+  <p class="prompt">When last did you do something for the first time?</p>
+  <p class="body">Share the experience, if you don't mind.</p>
+  <textarea id="firstTimeInput" placeholder="Optional..."></textarea>
+  <button class="single-btn" id="firstTimeBtn">Daily Reset</button>
+ </div>
+</div>
+
+<!-- CLOSING NOTE -->
+<div id="closingNote" class="page onb">
+ <div class="onb-container" style="text-align:center;">
+  <div class="eyebrow">Before You Go</div>
+  <p class="body" style="text-align:center;line-height:1.7;">However today's reset landed for you — showing up was the whole point. That's not nothing. That's everything, actually.</p>
+  <p class="body" style="text-align:center;line-height:1.7;">Come back tomorrow. There's more waiting, gently.</p>
+  <p class="line">And see you soon.</p>
+  <button class="single-btn" id="closingNoteBtn">Enter</button>
+ </div>
+</div>
+
+<!-- RATO / DAILY RESET SCREEN -->
+<div id="rato" class="page">
+ <div class="rato-container">
+  <svg viewBox="0 0 600 600">
+   <rect x="102" y="102" width="396" height="396" fill="none" stroke="rgba(0,0,0,0.65)" stroke-width="2.2"/>
+   <circle cx="300" cy="300" r="198" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="2.2"/>
+   <polygon points="300,102 473.2,398 126.8,398" fill="rgba(41,161,255,0.30)" stroke="rgba(0,0,0,0.6)" stroke-width="2"/>
+  </svg>
+  <div class="daily-reset">DAILY RESET</div>
+  <div class="title">
+   <h1>D<span class="accent">i</span>HAdeclutter</h1>
+   <h2>A Method of Movement</h2>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="day-label" id="dayLabel">Day 1</div>
+  <div class="lives-row" id="livesRow"></div>
+
+  <div class="rato-msg" id="ratoMsg">Welcome. You have 9 lives. No pressure to do today's task — just showing up matters.</div>
+
+  <div class="task-box">
+   <h3>Today's Move</h3>
+   <p id="taskText">Pack the mess bin.</p>
+  </div>
+
+  <textarea id="reflection" placeholder="What did you notice about yourself doing this? (optional)"></textarea>
+
+  <div class="btn-row">
+   <button class="btn-secondary" id="skipBtn">Not today</button>
+   <button class="btn-primary" id="doneBtn">Done — log it</button>
+  </div>
+
+  <div class="streak-note" id="streakNote">3 consecutive check-ins restores a life.</div>
+
+  <div class="test-controls">
+   <span>Test only — remove before real deploy</span><br>
+   <button id="nextDayBtn">Skip to next day →</button>
+   <button id="resetBtn">Reset progress</button>
+  </div>
+ </div>
+</div>
+
+<!-- SIREN OVERLAY -->
+<div id="siren-overlay">
+ <h1>0 LIVES</h1>
+ <p>You stepped away. That's okay — RATO is giving you another chance.<br><br>Starting again with 6 lives.</p>
+</div>
+
+<script>
+/* ---------------- STATE ---------------- */
+const TASKS = [
+ "Pack the mess bin.",
+ "Wardrobe — before & after.",
+ "Clear one surface completely.",
+ "One drawer, start to finish.",
+ "Photograph the space you avoid.",
+ "Give away one thing you don't use.",
+ "Wipe down every mirror in your home.",
+ "Sort one pile you've been stepping over.",
+ "Sit in the cleared space for 2 minutes."
+];
+
+const STARTING_LIVES_SEQUENCE = [9, 6, 3, 3]; // 4th+ restart floors at 3
+
+function loadState(){
+ const raw = localStorage.getItem('diha_daily_reset');
+ if(raw) return JSON.parse(raw);
+ return {
+  cycleIndex: 0,
+  lives: STARTING_LIVES_SEQUENCE[0],
+  day: 1,
+  streak: 0,
+  lastAction: null // 'done' | 'skip' | 'missed'
+ };
+}
+function saveState(s){ localStorage.setItem('diha_daily_reset', JSON.stringify(s)); }
+
+let state = loadState();
+
+/* ---------------- RENDER ---------------- */
+function render(){
+ document.getElementById('dayLabel').textContent = 'Day ' + state.day;
+ document.getElementById('taskText').textContent = TASKS[(state.day - 1) % TASKS.length];
+
+ const startLives = STARTING_LIVES_SEQUENCE[Math.min(state.cycleIndex, STARTING_LIVES_SEQUENCE.length-1)];
+ const row = document.getElementById('livesRow');
+ row.innerHTML = '';
+ for(let i=0;i<startLives;i++){
+  const dot = document.createElement('div');
+  dot.className = 'life' + (i < state.lives ? '' : ' lost');
+  row.appendChild(dot);
+ }
+
+ const msg = document.getElementById('ratoMsg');
+ if(state.lives <= 2){
+  msg.textContent = `You have ${state.lives} ${state.lives===1?'life':'lives'} left. Whenever you're ready.`;
+ } else if(state.streak > 0 && state.streak % 3 === 0){
+  msg.textContent = `${state.streak} days of showing up. A life has been restored.`;
+ } else {
+  msg.textContent = `You have ${state.lives} ${state.lives===1?'life':'lives'} left. No pressure — just show up.`;
+ }
+
+ document.getElementById('streakNote').textContent =
+  `Current streak: ${state.streak} day${state.streak===1?'':'s'}. Every 3 in a row restores a life.`;
+
+ document.getElementById('reflection').value = '';
+}
+
+/* ---------------- SIREN ---------------- */
+function playSiren(){
+ const ctx = new (window.AudioContext || window.webkitAudioContext)();
+ const duration = 9; // seconds
+ const startTime = ctx.currentTime;
+ for(let i=0;i<duration*2;i++){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(i%2===0 ? 880 : 660, startTime + i*0.5);
+  gain.gain.setValueAtTime(0.25, startTime + i*0.5);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime + i*0.5);
+  osc.stop(startTime + i*0.5 + 0.5);
+ }
+ document.getElementById('siren-overlay').classList.add('active');
+ setTimeout(()=>{
+  document.getElementById('siren-overlay').classList.remove('active');
+  triggerRestart();
+ }, duration*1000);
+}
+
+function triggerRestart(){
+ state.cycleIndex += 1;
+ state.lives = STARTING_LIVES_SEQUENCE[Math.min(state.cycleIndex, STARTING_LIVES_SEQUENCE.length-1)];
+ state.day += 1;
+ state.streak = 0;
+ saveState(state);
+ render();
+}
+
+/* ---------------- ACTIONS ---------------- */
+function logAction(type){
+ if(type === 'done'){
+  state.streak += 1;
+  if(state.streak % 3 === 0){
+   const startLives = STARTING_LIVES_SEQUENCE[Math.min(state.cycleIndex, STARTING_LIVES_SEQUENCE.length-1)];
+   state.lives = Math.min(state.lives + 1, startLives);
+  }
+ } else {
+  // 'not today' or a missed day both cost a life
+  state.streak = 0;
+  state.lives -= 1;
+ }
+
+ if(state.lives <= 0){
+  saveState(state);
+  render();
+  playSiren();
+  return;
+ }
+
+ state.day += 1;
+ saveState(state);
+ render();
+}
+
+document.getElementById('doneBtn').addEventListener('click', ()=>logAction('done'));
+document.getElementById('skipBtn').addEventListener('click', ()=>logAction('skip'));
+
+/* test-only controls */
+document.getElementById('nextDayBtn').addEventListener('click', ()=>logAction('skip'));
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+ localStorage.removeItem('diha_daily_reset');
+ localStorage.removeItem('diha_onboarded');
+ localStorage.removeItem('diha_profile');
+ localStorage.removeItem('diha_hoard');
+ localStorage.removeItem('rato_brain_v1');
+ state = loadState();
+ showScreen('openSlide1');
+});
+
+/* ---------------- ONBOARDING NAV ---------------- */
+function showScreen(id){
+ document.querySelectorAll('.onb, #rato').forEach(el => el.classList.remove('show'));
+ document.getElementById(id).classList.add('show');
+}
+
+function loadProfile(){
+ const raw = localStorage.getItem('diha_profile');
+ return raw ? JSON.parse(raw) : {};
+}
+function saveProfile(p){ localStorage.setItem('diha_profile', JSON.stringify(p)); }
+
+document.getElementById('openSlide1Btn').addEventListener('click', ()=>showScreen('openSlide2'));
+
+document.getElementById('declutterBtn').addEventListener('click', ()=>{
+ showScreen('ratoIntro');
+ watchForRatoName();
+});
+
+document.getElementById('hoardBtn').addEventListener('click', ()=>{
+ // set up 3 random check-in days within the next 9 days, client-side simulation
+ const now = Date.now();
+ const days = new Set();
+ while(days.size < 3){ days.add(1 + Math.floor(Math.random()*9)); }
+ localStorage.setItem('diha_hoard', JSON.stringify({
+  startedAt: now,
+  checkInDays: Array.from(days).sort((a,b)=>a-b),
+  checkInsUsed: 0,
+  active: true
+ }));
+ showScreen('hoardExit');
+});
+
+document.getElementById('gratitudeBtn').addEventListener('click', ()=>{
+ const p = loadProfile();
+ p.gratitude = document.getElementById('gratitudeInput').value;
+ saveProfile(p);
+ showScreen('letter1');
+});
+
+document.getElementById('ratoContinueBtn').addEventListener('click', ()=>{
+ clearInterval(ratoPollInterval);
+ showScreen('profileForm');
+});
+
+let ratoPollInterval = null;
+function watchForRatoName(){
+ ratoPollInterval = setInterval(()=>{
+  try{
+   const brain = JSON.parse(localStorage.getItem('rato_brain_v1'));
+   if(brain && brain.userName){
+    document.getElementById('ratoContinueBtn').style.display = 'block';
+    document.getElementById('ratoGiftBox').style.display = 'block';
+   }
+  }catch(e){}
+ }, 1000);
+}
+
+document.getElementById('profileSaveBtn').addEventListener('click', ()=>{
+ const p = loadProfile();
+ p.name = document.getElementById('profileName').value;
+ p.whatsapp = document.getElementById('profileWhatsapp').value;
+ p.goalOrReflection = document.getElementById('profileGoal').value;
+ saveProfile(p);
+ showScreen('gratitude');
+});
+
+const letter1Input = document.getElementById('letter1Input');
+letter1Input.addEventListener('input', ()=>{
+ const words = letter1Input.value.trim().split(/\s+/).filter(Boolean).length;
+ const countEl = document.getElementById('letter1Count');
+ countEl.textContent = words + ' / 60 words';
+ countEl.classList.toggle('over', words > 60);
+});
+
+document.getElementById('letter1Btn').addEventListener('click', ()=>{
+ const p = loadProfile();
+ p.letterToChildSelf = letter1Input.value;
+ saveProfile(p);
+ showScreen('letter2');
+});
+
+document.getElementById('letter2Btn').addEventListener('click', ()=>{
+ const p = loadProfile();
+ p.letterToFutureSelf = document.getElementById('letter2Input').value;
+ saveProfile(p);
+ showScreen('firstTime');
+});
+
+document.getElementById('firstTimeBtn').addEventListener('click', ()=>{
+ const p = loadProfile();
+ p.firstTimeReflection = document.getElementById('firstTimeInput').value;
+ p.onboardedAt = Date.now();
+ saveProfile(p);
+ localStorage.setItem('diha_onboarded', 'true');
+ showScreen('closingNote');
+});
+
+document.getElementById('closingNoteBtn').addEventListener('click', ()=>{
+ showScreen('rato');
+ render();
+});
+
+/* ---------------- HOARD MODE CHECK-IN (simulated) ---------------- */
+function checkHoardMode(){
+ const raw = localStorage.getItem('diha_hoard');
+ if(!raw) return false;
+ const h = JSON.parse(raw);
+ if(!h.active) return false;
+
+ const daysElapsed = Math.floor((Date.now() - h.startedAt) / 86400000);
+
+ if(daysElapsed > 9){
+  h.active = false;
+  localStorage.setItem('diha_hoard', JSON.stringify(h));
+  return false;
+ }
+
+ const dueCheckIn = h.checkInDays.find(d => d <= daysElapsed) !== undefined
+  && h.checkInsUsed < h.checkInDays.filter(d => d <= daysElapsed).length;
+
+ if(dueCheckIn){
+  h.checkInsUsed += 1;
+  localStorage.setItem('diha_hoard', JSON.stringify(h));
+  document.querySelector('#openSlide2 .body').textContent =
+   `RATO checked in — day ${daysElapsed} since you paused. No pressure. Declutter whenever you're ready.`;
+  return true;
+ }
+
+ return true;
+}
+
+/* ---------------- INTRO SEQUENCE ---------------- */
+function startExperience(){
+ setTimeout(()=>{
+  document.getElementById("splash").classList.add("reveal");
+ },3500);
+
+ setTimeout(()=>{
+  document.getElementById("splash").style.display="none";
+
+  const onboarded = localStorage.getItem('diha_onboarded') === 'true';
+  if(onboarded){
+   showScreen('rato');
+   render();
+  } else {
+   const hoardActive = checkHoardMode();
+   showScreen(hoardActive ? 'openSlide2' : 'openSlide1');
+  }
+ },5200);
+}
+
+window.onload = startExperience;
+</script>
+</body>
+</html>

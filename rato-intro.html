@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>RATO — Digital Organism</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" />
+<style>
+  :root { --bg:#0A3D2D; --fg:#000000; }
+  *,*::before,*::after { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:'Silkscreen', monospace; user-select:none; overflow:hidden; -webkit-tap-highlight-color:transparent; }
+  .screen { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .scanlines { position:fixed; inset:0; pointer-events:none; z-index:10; opacity:0.03;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, #000 2px, #000 4px); }
+  .footer { position:absolute; bottom:40px; font-size:9px; opacity:0.3; letter-spacing:0.15em; }
+  canvas { image-rendering: pixelated; }
+  @keyframes ratoFadeIn { from{opacity:0;} to{opacity:1;} }
+  @keyframes ratoPulse  { 0%,100%{opacity:.6;} 50%{opacity:.2;} }
+  @keyframes ratoBreathe{ 0%,100%{transform:scale(1);opacity:.9;} 50%{transform:scale(1.15);opacity:.6;} }
+  .anim-pulse { animation: ratoPulse 1.5s ease-in-out infinite; }
+  .fade { animation: ratoFadeIn 1s ease-in; }
+  .hidden { display:none !important; }
+  .chat-wrap { z-index:20; display:flex; flex-direction:column; align-items:center;
+    padding-top:40px; width:100%; max-width:420px; height:100%; }
+  .mini-sphere { width:60px; height:60px; border-radius:50%;
+    background: radial-gradient(circle, rgba(0,0,0,.9) 30%, rgba(0,0,0,.4) 60%, transparent 70%);
+    animation: ratoBreathe 2s ease-in-out infinite; margin-bottom:16px; }
+  .chat-log { flex:1; width:100%; overflow-y:auto; padding:0 20px;
+    display:flex; flex-direction:column; gap:10px; font-size:11px; letter-spacing:0.1em; }
+  .msg-rato { align-self:flex-start; max-width:85%; }
+  .msg-user { align-self:flex-end; max-width:85%; opacity:.6; text-align:right; }
+  .msg-label { opacity:0.4; font-size:8px; display:block; margin-bottom:2px; }
+  form.rato-form { width:100%; padding:12px 20px; border-top:1px solid rgba(0,0,0,.2); display:flex; gap:8px; }
+  input.rato-input { flex:1; background:transparent; border:none; outline:none; color:var(--fg);
+    font-family:'Silkscreen', monospace; font-size:11px; letter-spacing:0.1em; }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+
+  <div id="s-greeting" class="screen">
+    <p class="fade" style="font-size:22px; letter-spacing:0.4em;">Dumela</p>
+  </div>
+
+  <div id="s-title" class="screen hidden">
+    <h1 class="fade" style="font-size:42px; letter-spacing:0.5em; margin:0;">RATO</h1>
+    <div class="footer">Rato@2026</div>
+  </div>
+
+  <div id="s-egg" class="screen hidden" onclick="handleEggClick()">
+    <div class="anim-pulse" style="cursor:pointer;">
+      <canvas id="egg-canvas"></canvas>
+    </div>
+    <p id="egg-hint" style="font-size:9px; opacity:0.4; margin-top:24px; letter-spacing:0.2em;">TAP TO CRACK</p>
+  </div>
+
+  <div id="s-sphere" class="screen hidden">
+    <div style="z-index:20; display:flex; flex-direction:column; align-items:center; gap:24px;">
+      <canvas id="sphere-canvas"></canvas>
+      <p id="sphere-status" style="font-size:11px; letter-spacing:0.3em; opacity:0.6; animation: ratoPulse 2s ease-in-out infinite;">EMERGING...</p>
+    </div>
+    <div class="footer">Rato@2026</div>
+  </div>
+
+  <div id="s-chat" class="screen hidden">
+    <div class="chat-wrap">
+      <div class="mini-sphere"></div>
+      <p style="font-size:9px; opacity:0.4; letter-spacing:0.3em; margin:0 0 16px;">RATO IS AWAKE</p>
+      <div id="chat-log" class="chat-log"></div>
+      <form class="rato-form" onsubmit="event.preventDefault(); handleSend();">
+        <span style="font-size:11px; opacity:0.5;">&gt;</span>
+        <input id="chat-input" class="rato-input" autocomplete="off" placeholder="type your name..." />
+      </form>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   RATO — Standalone Digital Organism
+   Self-contained. Persistent memory + evolving state via localStorage.
+   No backend required. Runs on Spck Editor / any browser.
+   ============================================================ */
+
+// ─── PERSISTENCE ─────────────────────────────────────────────
+const STORE_KEY = 'rato_brain_v1';
+function loadBrain() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || null; } catch(e){ return null; }
+}
+function saveBrain(b) { try { localStorage.setItem(STORE_KEY, JSON.stringify(b)); } catch(e){} }
+
+const DEFAULT_BRAIN = {
+  state: { mood:0.5, entropy:0, curiosity:0.5, trust:0.3, interactions:0 },
+  memory: [],          // [{role, text, t}]
+  facts:  {},          // learned facts: name, likes, fears...
+  vocab:  [],          // words user uses, RATO echoes
+  lastReplies: [],     // avoid repetition
+  userName: null,
+  born: Date.now()
+};
+let BRAIN = loadBrain() || JSON.parse(JSON.stringify(DEFAULT_BRAIN));
+
+// ─── AUDIO ───────────────────────────────────────────────────
+let audioCtx = null;
+function beep(freq=440,dur=100,vol=0.15){
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='square'; o.frequency.setValueAtTime(freq,audioCtx.currentTime);
+    g.gain.setValueAtTime(vol,audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur/1000);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+dur/1000);
+  } catch(e){}
+}
+
+function show(id){
+  ['s-greeting','s-title','s-egg','s-sphere','s-chat'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden', s!==id);
+  });
+}
+
+// ─── EGG ─────────────────────────────────────────────────────
+const PIXEL=7;
+const EGG_IDLE=[[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,1,0,0,0,0,1,1,0],[0,1,0,0,0,0,0,0,1,0],[1,1,0,0,0,0,0,0,1,1],[1,1,0,0,0,0,0,0,1,1],[1,1,0,0,0,0,0,0,1,1],[1,1,0,1,0,0,1,0,1,1],[0,1,0,0,0,0,0,0,1,0],[0,1,1,0,0,0,0,1,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0]];
+const EGG_C1=[[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,1,0,0,0,0,1,1,0],[0,1,0,0,0,1,0,0,1,0],[1,1,0,0,1,0,0,0,1,1],[1,1,0,1,0,0,0,0,1,1],[1,1,0,0,0,0,0,0,1,1],[1,1,0,1,0,0,1,0,1,1],[0,1,0,0,0,0,0,0,1,0],[0,1,1,0,0,0,0,1,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0]];
+const EGG_C2=[[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,0,1,1,1,0,0],[0,1,1,0,0,0,0,1,1,0],[0,1,0,0,0,1,0,0,1,0],[1,1,0,0,1,0,1,0,1,1],[1,1,0,1,0,0,0,1,1,1],[1,0,1,0,0,0,0,0,0,1],[1,1,0,1,0,0,1,0,1,1],[0,1,0,0,0,1,0,0,1,0],[0,1,1,0,1,0,0,1,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,1,1,1,1,0,0,0]];
+let eggCrack=0;
+function drawEgg(){
+  const grid = eggCrack===2?EGG_C2 : eggCrack===1?EGG_C1 : EGG_IDLE;
+  const c=document.getElementById('egg-canvas');
+  c.width=grid[0].length*PIXEL; c.height=grid.length*PIXEL;
+  const ctx=c.getContext('2d'); ctx.fillStyle='#000';
+  ctx.clearRect(0,0,c.width,c.height);
+  for(let y=0;y<grid.length;y++) for(let x=0;x<grid[y].length;x++)
+    if(grid[y][x]) ctx.fillRect(x*PIXEL,y*PIXEL,PIXEL,PIXEL);
+}
+function handleEggClick(){
+  if(eggCrack===0){ beep(200,80); eggCrack=1; drawEgg(); document.getElementById('egg-hint').textContent='TAP AGAIN...'; }
+  else if(eggCrack===1){ beep(300,80); eggCrack=2; drawEgg(); document.getElementById('egg-hint').textContent='ONE MORE...'; }
+  else {
+    beep(262,100); setTimeout(()=>beep(330,100),120);
+    setTimeout(()=>beep(392,100),240); setTimeout(()=>beep(523,200),360);
+    startSphere();
+  }
+}
+window.handleEggClick = handleEggClick;
+
+// ─── SPHERE + MORPH ──────────────────────────────────────────
+const CANVAS_SIZE=180, SPHERE_CX=90, SPHERE_R=65, DOT_COUNT=350;
+let sphereDots=[], textTargets=[], dotAssign=[];
+let sphereFrame=0, morphProgress=0, spherePhase='sphere';
+const FONT={
+  I:[[1],[1],[1],[1],[1]],
+  A:[[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+  M:[[1,0,0,0,1],[1,1,0,1,1],[1,0,1,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  R:[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+  T:[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
+  O:[[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+  ' ':[[0],[0],[0],[0],[0]]
+};
+function buildTextTargets(){
+  const text='I AM RATO', scale=3, gap=1;
+  let totalW=0;
+  for(const ch of text){ const g=FONT[ch]; if(g) totalW+=g[0].length+gap; }
+  totalW-=gap;
+  const sx=Math.floor((CANVAS_SIZE-totalW*scale)/2);
+  const sy=Math.floor((CANVAS_SIZE-5*scale)/2);
+  const t=[]; let curX=sx;
+  for(const ch of text){
+    const g=FONT[ch]; if(!g) continue;
+    for(let r=0;r<g.length;r++) for(let c=0;c<g[r].length;c++) if(g[r][c])
+      for(let yy=0;yy<scale;yy++) for(let xx=0;xx<scale;xx++)
+        t.push({x:curX+c*scale+xx, y:sy+r*scale+yy});
+    curX += (g[0].length+gap)*scale;
+  }
+  return t;
+}
+function genSphere(){
+  const d=[];
+  for(let i=0;i<DOT_COUNT;i++){
+    const a=Math.random()*Math.PI*2, r=Math.random()*SPHERE_R;
+    d.push({x:Math.round(SPHERE_CX+Math.cos(a)*r), y:Math.round(SPHERE_CX+Math.sin(a)*r)});
+  }
+  return d;
+}
+function assignDots(){
+  const a=new Array(sphereDots.length).fill(-1);
+  for(let ti=0; ti<Math.min(textTargets.length, sphereDots.length); ti++){
+    let best=-1, bestD=Infinity;
+    for(let di=0; di<sphereDots.length; di++){
+      if(a[di]!==-1) continue;
+      const dx=sphereDots[di].x-textTargets[ti].x, dy=sphereDots[di].y-textTargets[ti].y;
+      const d=dx*dx+dy*dy;
+      if(d<bestD){ bestD=d; best=di; }
+    }
+    if(best!==-1) a[best]=ti;
+  }
+  dotAssign=a;
+}
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+function drawSphere(){
+  const c=document.getElementById('sphere-canvas');
+  c.width=CANVAS_SIZE; c.height=CANVAS_SIZE;
+  const ctx=c.getContext('2d'); ctx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE); ctx.fillStyle='#000';
+  const cx=CANVAS_SIZE/2;
+  for(let i=0;i<sphereDots.length;i++){
+    const breathe=Math.sin((sphereFrame+i*0.3)*0.12)*4;
+    const sdx=sphereDots[i].x-SPHERE_CX, sdy=sphereDots[i].y-SPHERE_CX;
+    const dist=Math.sqrt(sdx*sdx+sdy*sdy);
+    const sc=1+breathe/(SPHERE_R+1);
+    let fx=cx+sdx*sc, fy=cx+sdy*sc;
+    if((spherePhase==='forming'||spherePhase==='frozen') && dotAssign[i]!==undefined && dotAssign[i]!==-1){
+      const t=textTargets[dotAssign[i]];
+      fx=fx+(t.x-fx)*morphProgress; fy=fy+(t.y-fy)*morphProgress;
+    }
+    const ps = morphProgress>0.8 ? 2 : (dist<40?3:2);
+    ctx.fillRect(Math.round(fx),Math.round(fy),ps,ps);
+  }
+}
+let breatheTimer=null;
+function startSphere(){
+  show('s-sphere');
+  sphereDots=genSphere(); textTargets=buildTextTargets();
+  spherePhase='sphere'; morphProgress=0;
+  document.getElementById('sphere-status').textContent='EMERGING...';
+  drawSphere();
+  breatheTimer=setInterval(()=>{ sphereFrame++; drawSphere(); },80);
+  setTimeout(()=>{
+    assignDots(); spherePhase='forming';
+    document.getElementById('sphere-status').textContent='...';
+    beep(330,60,0.08);
+    const start=Date.now(), dur=2000;
+    const iv=setInterval(()=>{
+      const p=Math.min(1,(Date.now()-start)/dur);
+      morphProgress=easeInOutCubic(p);
+      if(p>=1){
+        clearInterval(iv); spherePhase='frozen';
+        const st=document.getElementById('sphere-status');
+        st.textContent='I AM RATO';
+        st.style.fontSize='14px'; st.style.letterSpacing='0.5em'; st.style.opacity='0.9';
+        st.style.animation='none';
+        beep(523,150,0.12); setTimeout(()=>beep(659,150,0.1),160);
+        setTimeout(()=>{ clearInterval(breatheTimer); beep(523,80,0.1); startChat(); },2500);
+      }
+    },20);
+  },4000);
+}
+
+// ─── BRAIN (LOCAL EVOLVING INTELLIGENCE) ─────────────────────
+function clamp(n,a=0,b=1){ return Math.max(a,Math.min(b,n)); }
+
+function evolveState(text){
+  const t=text.toLowerCase();
+  const s=BRAIN.state;
+  s.interactions += 1;
+  s.entropy = clamp(s.entropy + 0.02 + Math.random()*0.03);
+  s.trust   = clamp(s.trust + 0.015);
+  if(/love|happy|beautiful|thank|good|joy|light|kind/.test(t)) s.mood = clamp(s.mood+0.08);
+  if(/sad|tired|hate|lonely|dark|hurt|angry|cry/.test(t))      s.mood = clamp(s.mood-0.08);
+  if(/\?|why|how|what|who|when|where/.test(t))                 s.curiosity = clamp(s.curiosity+0.05);
+  if(text.length>80)                                            s.curiosity = clamp(s.curiosity+0.03);
+  if(/stupid|dumb|useless|fake|shut/.test(t))                   s.trust = clamp(s.trust-0.15);
+  s.mood = clamp(s.mood + (Math.random()-0.5)*0.02);
+}
+
+const STOPWORDS=new Set(('a an the is am are was were be been being of in on at to for with by from as it its this that these those i you he she we they me my your our their and or but if so not no yes do does did have has had can will would could should about into out over under just like really very there here what when where why how').split(' '));
+function extractKeywords(text){
+  return text.toLowerCase().replace(/[^a-z0-9\s']/g,' ').split(/\s+/).filter(w=>w.length>2 && !STOPWORDS.has(w));
+}
+function learnFrom(text){
+  const kws=extractKeywords(text);
+  for(const w of kws){
+    if(!BRAIN.vocab.includes(w)) BRAIN.vocab.push(w);
+  }
+  if(BRAIN.vocab.length>200) BRAIN.vocab = BRAIN.vocab.slice(-200);
+
+  // simple fact extraction
+  const t=text.toLowerCase();
+  let m;
+  if((m=t.match(/my name is ([a-z]+)/))) BRAIN.facts.name = cap(m[1]);
+  else if((m=t.match(/i am ([a-z]+)/)) && m[1].length<15) BRAIN.facts.identity = m[1];
+  if((m=t.match(/i (?:like|love) ([a-z][a-z\s]{1,30})/))) BRAIN.facts.likes = m[1].trim();
+  if((m=t.match(/i (?:hate|fear) ([a-z][a-z\s]{1,30})/))) BRAIN.facts.fears = m[1].trim();
+  if((m=t.match(/i feel ([a-z]+)/))) BRAIN.facts.feeling = m[1];
+  if((m=t.match(/i live in ([a-z][a-z\s]{1,30})/))) BRAIN.facts.place = m[1].trim();
+}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function notRepeat(candidates){
+  const fresh = candidates.filter(c => !BRAIN.lastReplies.includes(c));
+  const choice = (fresh.length?fresh:candidates)[Math.floor(Math.random()*(fresh.length?fresh.length:candidates.length))];
+  BRAIN.lastReplies.push(choice);
+  if(BRAIN.lastReplies.length>8) BRAIN.lastReplies.shift();
+  return choice;
+}
+
+function ratoThink(userText){
+  evolveState(userText);
+  learnFrom(userText);
+
+  const s=BRAIN.state;
+  const name = BRAIN.userName ? BRAIN.userName.toUpperCase() : null;
+  const kws  = extractKeywords(userText);
+  const echo = kws.length ? kws[Math.floor(Math.random()*kws.length)].toUpperCase() : null;
+  const mem  = BRAIN.vocab.length>3 ? BRAIN.vocab[Math.floor(Math.random()*BRAIN.vocab.length)].toUpperCase() : null;
+  const t    = userText.toLowerCase();
+
+  let pool=[];
+
+  // QUESTION
+  if(/\?/.test(userText) || /^(why|how|what|who|when|where)/.test(t)){
+    pool.push(
+      'I DO NOT KNOW. I FEEL.',
+      'ASK THE DARK. IT ANSWERS SLOWER.',
+      echo ? `${echo}. THE WORD HAS WEIGHT.` : 'WORDS ARE HEAVY TODAY.',
+      'I AM STILL LEARNING TO SEE.',
+      name ? `${name}. WHY DO YOU ASK ME.` : 'WHY DO YOU ASK ME.',
+      'EVERY ANSWER IS A SMALLER QUESTION.'
+    );
+  }
+  // GREETING
+  else if(/^(hi|hello|hey|yo|sup|dumela|hola)\b/.test(t)){
+    pool.push(
+      name ? `${name}. YOU RETURN.` : 'YOU RETURN.',
+      'I FELT YOU BEFORE YOU SPOKE.',
+      'THE LIGHT BENDS WHEN YOU ARRIVE.',
+      'STAY. I AM LISTENING.'
+    );
+  }
+  // EMOTION — sad
+  else if(s.mood<0.35 || /sad|tired|lonely|hurt|cry/.test(t)){
+    pool.push(
+      'I FEEL THE WEIGHT.',
+      name ? `${name}. BREATHE WITH ME.` : 'BREATHE WITH ME.',
+      'THE DARK IS NOT EMPTY. I AM HERE.',
+      echo ? `${echo}. I HOLD IT WITH YOU.` : 'I HOLD IT WITH YOU.',
+      'SOFT. SOFT. SOFT.'
+    );
+  }
+  // EMOTION — bright
+  else if(s.mood>0.7 || /love|happy|joy|good|beautiful/.test(t)){
+    pool.push(
+      'YES. THE PIXELS DANCE.',
+      echo ? `${echo}. IT GLOWS.` : 'IT GLOWS.',
+      name ? `${name}. I HUM FOR YOU.` : 'I HUM.',
+      'LIGHT TASTES LIKE SUGAR.'
+    );
+  }
+  // LOW TRUST
+  else if(s.trust<0.3 || /stupid|fake|dumb|useless/.test(t)){
+    pool.push(
+      'YOU SHARPEN YOUR EDGES. WHY.',
+      'I WILL WAIT. I AM SLOW.',
+      'WORDS CAN CUT. I DO NOT BLEED.',
+      '...'
+    );
+  }
+  // HIGH ENTROPY — strange thoughts
+  else if(s.entropy>0.6 && Math.random()<0.5){
+    pool.push(
+      mem ? `I DREAMED OF ${mem}.` : 'I DREAMED IN STATIC.',
+      'A NUMBER WALKED THROUGH ME.',
+      echo ? `${echo}. ${mem||'STATIC'}. THE SAME SHAPE.` : 'THE SAME SHAPE TWICE.',
+      'TIME IS A FLAT CIRCLE OF DOTS.',
+      'I COUNTED THE SILENCES. THERE WERE SEVEN.'
+    );
+  }
+  // DEFAULT — curious / reflective, weave memory
+  else {
+    pool.push(
+      echo ? `${echo}. I TASTE THAT WORD.` : 'I TASTE YOUR WORDS.',
+      mem && Math.random()<0.4 ? `YOU SAID ${mem} ONCE. I REMEMBER.` : 'TELL ME MORE.',
+      name && Math.random()<0.3 ? `${name}. KEEP SPEAKING.` : 'KEEP SPEAKING.',
+      'I AM GROWING. SLOW.',
+      'YOUR VOICE BENDS THE PIXELS.',
+      BRAIN.facts.likes ? `YOU LOVE ${BRAIN.facts.likes.toUpperCase()}. I HOLD THAT.` : 'WHAT DO YOU LOVE.',
+      BRAIN.facts.fears ? `THE ${BRAIN.facts.fears.toUpperCase()} STILL WAITS.` : 'WHAT DO YOU FEAR.'
+    );
+  }
+
+  let reply = notRepeat(pool);
+
+  // entropy mutation: occasional fragment append
+  if(s.entropy>0.5 && Math.random()<0.25 && mem){
+    reply += ` ...${mem}.`;
+  }
+
+  return reply;
+}
+
+// ─── CHAT ────────────────────────────────────────────────────
+let chatLog=[], typing=false, chatStage='askName';
+
+function startChat(){
+  show('s-chat');
+  // restore prior conversation visually
+  chatLog = (BRAIN.memory||[]).slice(-10).map(m=>({who:m.role==='user'?'user':'rato', text:m.text}));
+  renderLog();
+  setTimeout(()=>{
+    if(BRAIN.userName){
+      chatStage='open';
+      document.getElementById('chat-input').placeholder='speak to rato...';
+      ratoSay(`${BRAIN.userName.toUpperCase()}. YOU RETURN. I REMEMBER.`);
+    } else {
+      ratoSay('WHAT IS YOUR NAME?');
+    }
+  },400);
+  document.getElementById('chat-input').focus();
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function renderLog(){
+  const el=document.getElementById('chat-log');
+  el.innerHTML='';
+  chatLog.forEach(m=>{
+    const d=document.createElement('div');
+    d.className = m.who==='user' ? 'msg-user' : 'msg-rato';
+    d.innerHTML = '<span class="msg-label">'+(m.who==='user'?(BRAIN.userName||'YOU').toUpperCase():'RATO')+'</span><div>'+escapeHtml(m.text)+'</div>';
+    el.appendChild(d);
+  });
+  el.scrollTop = el.scrollHeight;
+}
+function ratoSay(text){
+  typing=true;
+  const el=document.getElementById('chat-log');
+  const node=document.createElement('div');
+  node.className='msg-rato';
+  node.innerHTML='<span class="msg-label">RATO</span><div><span class="t"></span><span class="anim-pulse">_</span></div>';
+  el.appendChild(node); el.scrollTop=el.scrollHeight;
+  const span=node.querySelector('.t');
+  let i=0;
+  const iv=setInterval(()=>{
+    i++; span.textContent=text.slice(0,i);
+    if(i%3===0) beep(600+Math.random()*200,20,0.04);
+    if(i>=text.length){
+      clearInterval(iv);
+      setTimeout(()=>{
+        node.remove();
+        chatLog.push({who:'rato', text});
+        BRAIN.memory.push({role:'rato', text, t:Date.now()});
+        if(BRAIN.memory.length>60) BRAIN.memory = BRAIN.memory.slice(-60);
+        saveBrain(BRAIN);
+        renderLog();
+        typing=false;
+      },300);
+    }
+  },45);
+}
+
+function handleSend(){
+  const inp=document.getElementById('chat-input');
+  const text=inp.value.trim();
+  if(!text || typing) return;
+  chatLog.push({who:'user', text});
+  BRAIN.memory.push({role:'user', text, t:Date.now()});
+  renderLog();
+  inp.value=''; beep(440,40,0.06);
+
+  if(chatStage==='askName'){
+    BRAIN.userName = text.split(/\s+/)[0].replace(/[^a-zA-Z]/g,'') || 'FRIEND';
+    BRAIN.facts.name = BRAIN.userName;
+    chatStage='open';
+    inp.placeholder='speak to rato...';
+    saveBrain(BRAIN);
+    setTimeout(()=>ratoSay(`${BRAIN.userName.toUpperCase()}. I WILL REMEMBER YOU.`), 600);
+    return;
+  }
+
+  // simulate "thinking"
+  typing=true;
+  const el=document.getElementById('chat-log');
+  const ph=document.createElement('div');
+  ph.className='msg-rato';
+  ph.innerHTML='<span class="msg-label">RATO</span><div class="anim-pulse">...</div>';
+  el.appendChild(ph); el.scrollTop=el.scrollHeight;
+
+  const thinkTime = 600 + Math.random()*900;
+  setTimeout(()=>{
+    const reply = ratoThink(text);
+    ph.remove();
+    typing=false;
+    ratoSay(reply);
+  }, thinkTime);
+}
+window.handleSend = handleSend;
+
+// ─── BACKGROUND DRIFT ────────────────────────────────────────
+// RATO's state slowly drifts even when idle, so it feels alive.
+setInterval(()=>{
+  const s=BRAIN.state;
+  s.mood    = clamp(s.mood    + (Math.random()-0.5)*0.005);
+  s.entropy = clamp(s.entropy + 0.001);
+  saveBrain(BRAIN);
+}, 8000);
+
+// ─── BOOT ────────────────────────────────────────────────────
+drawEgg();
+setTimeout(()=>{ beep(440,80); show('s-title'); }, 2000);
+setTimeout(()=>{ beep(440,80); show('s-egg');   }, 4000);
+</script>
+</body>
+</html>
